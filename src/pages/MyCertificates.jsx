@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 
 import {
@@ -7,7 +8,8 @@ import {
   Card,
   Button,
   Badge,
-  Modal
+  Modal,
+  Spinner
 } from 'react-bootstrap'
 
 import {
@@ -15,7 +17,8 @@ import {
   Eye,
   Pencil,
   Download,
-  Trash2
+  Trash2,
+  Share2
 } from 'lucide-react'
 
 import { useNavigate } from 'react-router-dom'
@@ -24,30 +27,35 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
 import CertificatePreview from '../components/CertificatePreview'
+import CertificateShare from '../components/CertificateShare'
+
+
+const API_URL =
+  'https://backend-certificate-mw53.onrender.com'
 
 
 function MyCertificate() {
 
   const navigate = useNavigate()
 
-  // BACKEND API URL
-  const API_URL =
-    'https://backend-certificate-mw53.onrender.com'
 
-
-  // STATES
   const [certificates, setCertificates] = useState([])
 
   const [selectedCertificate, setSelectedCertificate] =
     useState(null)
 
-  const [showModal, setShowModal] = useState(false)
+  const [showModal, setShowModal] =
+    useState(false)
 
-  const [loading, setLoading] = useState(true)
+  const [showShareModal, setShowShareModal] =
+    useState(false)
+
+  const [loading, setLoading] =
+    useState(true)
 
 
   // ==========================================
-  // LOAD CERTIFICATES FROM BACKEND
+  // GET ALL CERTIFICATES
   // ==========================================
 
   useEffect(() => {
@@ -62,40 +70,51 @@ function MyCertificate() {
           `${API_URL}/api/certificates`
         )
 
-        const result = await response.json()
-
-        console.log('Backend response:', result)
-
-
         if (!response.ok) {
 
           throw new Error(
-            result.message || 'Failed to fetch certificates'
+            `Failed to load certificates: ${response.status}`
           )
 
         }
 
+        const result = await response.json()
 
-        // Handle different backend response formats
+        console.log(
+          'Certificates response:',
+          result
+        )
 
-        const certificateList = Array.isArray(result)
-          ? result
-          : result.certificates ||
-            result.data ||
-            []
+
+        let certificateList = []
+
+        if (Array.isArray(result)) {
+
+          certificateList = result
+
+        } else if (Array.isArray(result.certificates)) {
+
+          certificateList = result.certificates
+
+        } else if (Array.isArray(result.data)) {
+
+          certificateList = result.data
+
+        }
 
 
         setCertificates(certificateList)
 
-
       } catch (error) {
 
         console.error(
-          'Error fetching certificates:',
+          'Error loading certificates:',
           error
         )
 
-        setCertificates([])
+        alert(
+          'Unable to load certificates. Please try again.'
+        )
 
       } finally {
 
@@ -111,6 +130,7 @@ function MyCertificate() {
   }, [])
 
 
+
   // ==========================================
   // VIEW CERTIFICATE
   // ==========================================
@@ -122,6 +142,7 @@ function MyCertificate() {
     setShowModal(true)
 
   }
+
 
 
   // ==========================================
@@ -140,11 +161,26 @@ function MyCertificate() {
   }
 
 
+
+  // ==========================================
+  // SHARE CERTIFICATE
+  // ==========================================
+
+  const handleShare = (certificate) => {
+
+    setSelectedCertificate(certificate)
+
+    setShowShareModal(true)
+
+  }
+
+
+
   // ==========================================
   // DELETE CERTIFICATE
   // ==========================================
 
-  const handleDelete = async (certificateId) => {
+  const handleDelete = async (certificate) => {
 
     const confirmDelete = window.confirm(
       'Are you sure you want to delete this certificate?'
@@ -152,29 +188,100 @@ function MyCertificate() {
 
 
     if (!confirmDelete) {
+
       return
+
+    }
+
+
+    // Check all possible ID fields
+
+    const deleteId =
+      certificate?._id ||
+      certificate?.id ||
+      certificate?.certificateId
+
+
+    if (!deleteId) {
+
+      alert('Certificate ID not found.')
+
+      console.error(
+        'Certificate ID is missing:',
+        certificate
+      )
+
+      return
+
     }
 
 
     try {
 
-      const response = await fetch(
-        `${API_URL}/api/certificates/${certificateId}`,
-        {
-          method: 'DELETE'
-        }
+      console.log(
+        'Deleting certificate ID:',
+        deleteId
       )
 
 
-      const result = await response.json()
+      const response = await fetch(
 
-      console.log('Delete response:', result)
+        `${API_URL}/api/certificates/${deleteId}`,
+
+        {
+          method: 'DELETE',
+
+          headers: {
+            'Content-Type': 'application/json'
+          }
+
+        }
+
+      )
+
+
+      // Safely handle empty response
+
+      const responseText =
+        await response.text()
+
+
+      let result = {}
+
+
+      try {
+
+        result = responseText
+          ? JSON.parse(responseText)
+          : {}
+
+      } catch {
+
+        result = {
+          message: responseText
+        }
+
+      }
+
+
+      console.log(
+        'Delete status:',
+        response.status
+      )
+
+      console.log(
+        'Delete response:',
+        result
+      )
 
 
       if (!response.ok) {
 
         throw new Error(
-          result.message || 'Failed to delete certificate'
+
+          result.message ||
+          `Delete failed with status ${response.status}`
+
         )
 
       }
@@ -182,30 +289,46 @@ function MyCertificate() {
 
       // Remove deleted certificate from UI
 
-      const updatedCertificates =
-        certificates.filter(
-          (certificate) =>
-            certificate.certificateId !== certificateId
-        )
+      setCertificates(
+        (previousCertificates) => {
+
+          return previousCertificates.filter(
+            (item) => {
+
+              const itemId =
+                item?._id ||
+                item?.id ||
+                item?.certificateId
+
+              return itemId !== deleteId
+
+            }
+          )
+
+        }
+      )
 
 
-      setCertificates(updatedCertificates)
+      const selectedId =
+        selectedCertificate?._id ||
+        selectedCertificate?.id ||
+        selectedCertificate?.certificateId
 
 
-      // Close modal if deleted certificate is selected
-
-      if (
-        selectedCertificate?.certificateId === certificateId
-      ) {
+      if (selectedId === deleteId) {
 
         setSelectedCertificate(null)
 
         setShowModal(false)
 
+        setShowShareModal(false)
+
       }
 
 
-      alert('Certificate deleted successfully!')
+      alert(
+        'Certificate deleted successfully!'
+      )
 
 
     } catch (error) {
@@ -215,13 +338,15 @@ function MyCertificate() {
         error
       )
 
+
       alert(
-        'Unable to delete certificate. Please try again.'
+        `Unable to delete certificate: ${error.message}`
       )
 
     }
 
   }
+
 
 
   // ==========================================
@@ -235,15 +360,11 @@ function MyCertificate() {
 
     try {
 
-      // Find current certificate card
-
       const card =
         event.currentTarget.closest(
           '.certificate-card'
         )
 
-
-      // Find certificate preview
 
       const preview =
         card?.querySelector(
@@ -257,12 +378,14 @@ function MyCertificate() {
           'Certificate preview not found'
         )
 
+        alert(
+          'Certificate preview not found.'
+        )
+
         return
 
       }
 
-
-      // Wait until fonts are loaded
 
       if (document.fonts?.ready) {
 
@@ -271,8 +394,6 @@ function MyCertificate() {
       }
 
 
-      // Wait for rendering
-
       await new Promise((resolve) => {
 
         setTimeout(resolve, 300)
@@ -280,10 +401,10 @@ function MyCertificate() {
       })
 
 
-      // Capture certificate preview
-
       const canvas = await html2canvas(
+
         preview,
+
         {
           scale: 3,
           useCORS: true,
@@ -293,6 +414,7 @@ function MyCertificate() {
           scrollX: 0,
           scrollY: 0
         }
+
       )
 
 
@@ -303,16 +425,17 @@ function MyCertificate() {
         )
 
 
-      // Create PDF
+      const pdf = new jsPDF({
 
-      const pdf = new jsPDF(
-        {
-          orientation: 'landscape',
-          unit: 'mm',
-          format: 'a4',
-          compress: true
-        }
-      )
+        orientation: 'landscape',
+
+        unit: 'mm',
+
+        format: 'a4',
+
+        compress: true
+
+      })
 
 
       const pageWidth =
@@ -333,8 +456,6 @@ function MyCertificate() {
         imageWidth / imageRatio
 
 
-      // Keep image inside A4 page
-
       if (imageHeight > pageHeight) {
 
         imageHeight = pageHeight
@@ -354,18 +475,25 @@ function MyCertificate() {
 
 
       pdf.addImage(
+
         imageData,
+
         'PNG',
+
         positionX,
+
         positionY,
+
         imageWidth,
+
         imageHeight,
+
         undefined,
+
         'FAST'
+
       )
 
-
-      // Create safe file name
 
       const recipientName =
         certificate.recipientName ||
@@ -384,8 +512,6 @@ function MyCertificate() {
             '-'
           )
 
-
-      // Download PDF
 
       pdf.save(
         `${safeFileName}-certificate.pdf`
@@ -409,8 +535,9 @@ function MyCertificate() {
   }
 
 
+
   // ==========================================
-  // LOADING STATE
+  // LOADING SCREEN
   // ==========================================
 
   if (loading) {
@@ -419,28 +546,18 @@ function MyCertificate() {
 
       <main>
 
-        <Container className="py-5">
+        <Container className="py-5 text-center">
 
-          <div className="text-center py-5">
+          <Spinner
+            animation="border"
+            variant="primary"
+          />
 
-            <div
-              className="spinner-border text-primary mb-3"
-              role="status"
-            >
-              <span className="visually-hidden">
-                Loading...
-              </span>
-            </div>
+          <p className="text-secondary mt-3">
 
-            <h5>
-              Loading certificates...
-            </h5>
+            Loading certificates...
 
-            <p className="text-secondary">
-              Please wait while your certificates are loading.
-            </p>
-
-          </div>
+          </p>
 
         </Container>
 
@@ -451,9 +568,6 @@ function MyCertificate() {
   }
 
 
-  // ==========================================
-  // PAGE UI
-  // ==========================================
 
   return (
 
@@ -467,11 +581,16 @@ function MyCertificate() {
         <div className="mb-4">
 
           <h1 className="fw-bold">
+
             My Certificates
+
           </h1>
 
+
           <p className="text-secondary">
-            View, edit and download your certificates.
+
+            View, edit, share and download your certificates.
+
           </p>
 
         </div>
@@ -489,13 +608,20 @@ function MyCertificate() {
               className="text-secondary mb-3"
             />
 
+
             <h4>
+
               No Certificates Found
+
             </h4>
 
+
             <p className="text-secondary">
+
               Create your first certificate to see it here.
+
             </p>
+
 
             <Button
               variant="primary"
@@ -503,12 +629,15 @@ function MyCertificate() {
                 navigate('/create-certificate')
               }
             >
+
               Create Certificate
+
             </Button>
 
           </div>
 
         ) : (
+
 
           <Row className="g-4">
 
@@ -516,6 +645,7 @@ function MyCertificate() {
 
               <Col
                 key={
+                  certificate._id ||
                   certificate.id ||
                   certificate.certificateId
                 }
@@ -523,6 +653,7 @@ function MyCertificate() {
                 md={6}
                 xl={6}
               >
+
 
                 <Card
                   className="certificate-card h-100 shadow-sm border-0"
@@ -545,9 +676,9 @@ function MyCertificate() {
 
                   <Card.Body>
 
-                    <div
-                      className="d-flex justify-content-between align-items-start gap-2 mb-2"
-                    >
+
+                    <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
+
 
                       <div>
 
@@ -570,16 +701,18 @@ function MyCertificate() {
 
 
                       <Badge bg="success">
+
                         Created
+
                       </Badge>
+
 
                     </div>
 
 
 
-                    {/* CERTIFICATE INFORMATION */}
-
                     <div className="small text-secondary mb-3">
+
 
                       <div>
 
@@ -588,6 +721,8 @@ function MyCertificate() {
                         <strong>
 
                           {certificate.certificateId ||
+                            certificate._id ||
+                            certificate.id ||
                             'Not available'}
 
                         </strong>
@@ -607,6 +742,7 @@ function MyCertificate() {
                         </strong>
 
                       </div>
+
 
                     </div>
 
@@ -659,6 +795,27 @@ function MyCertificate() {
 
 
 
+                      {/* SHARE BUTTON */}
+
+                      <Button
+                        variant="outline-info"
+                        size="sm"
+                        onClick={() =>
+                          handleShare(certificate)
+                        }
+                      >
+
+                        <Share2
+                          size={15}
+                          className="me-1"
+                        />
+
+                        Share
+
+                      </Button>
+
+
+
                       {/* PDF BUTTON */}
 
                       <Button
@@ -689,9 +846,7 @@ function MyCertificate() {
                         variant="outline-danger"
                         size="sm"
                         onClick={() =>
-                          handleDelete(
-                            certificate.certificateId
-                          )
+                          handleDelete(certificate)
                         }
                       >
 
@@ -710,21 +865,27 @@ function MyCertificate() {
 
                   </Card.Body>
 
+
                 </Card>
+
 
               </Col>
 
             ))}
 
+
           </Row>
 
         )}
+
 
       </Container>
 
 
 
-      {/* VIEW CERTIFICATE MODAL */}
+      {/* ======================================
+          VIEW CERTIFICATE MODAL
+      ====================================== */}
 
       <Modal
         show={showModal}
@@ -733,10 +894,13 @@ function MyCertificate() {
         centered
       >
 
+
         <Modal.Header closeButton>
 
           <Modal.Title>
+
             Certificate Preview
+
           </Modal.Title>
 
         </Modal.Header>
@@ -749,16 +913,14 @@ function MyCertificate() {
 
             <>
 
-              {/* CERTIFICATE DESIGN */}
+              {/* SAME CERTIFICATE DESIGN */}
 
               <div className="certificate-modal-preview">
 
                 <div className="certificate-card-preview">
 
                   <CertificatePreview
-                    certificateData={
-                      selectedCertificate
-                    }
+                    certificateData={selectedCertificate}
                     compact={true}
                   />
 
@@ -768,44 +930,40 @@ function MyCertificate() {
 
 
 
-              {/* CERTIFICATE DETAILS */}
+              {/* CERTIFICATE INFORMATION */}
 
               <div className="mt-4">
 
                 <h5 className="fw-bold">
+
                   Certificate Details
+
                 </h5>
 
 
                 <p className="mb-1">
 
-                  <strong>
-                    Recipient:
-                  </strong>{' '}
+                  <strong>Recipient:</strong>{' '}
 
-                  {selectedCertificate.recipientName ||
-                    'Not specified'}
+                  {selectedCertificate.recipientName}
 
                 </p>
 
 
                 <p className="mb-1">
 
-                  <strong>
-                    Certificate ID:
-                  </strong>{' '}
+                  <strong>Certificate ID:</strong>{' '}
 
                   {selectedCertificate.certificateId ||
-                    'Not specified'}
+                    selectedCertificate._id ||
+                    selectedCertificate.id}
 
                 </p>
 
 
                 <p className="mb-1">
 
-                  <strong>
-                    Issue Date:
-                  </strong>{' '}
+                  <strong>Issue Date:</strong>{' '}
 
                   {selectedCertificate.issueDate ||
                     'Not specified'}
@@ -815,36 +973,10 @@ function MyCertificate() {
 
                 <p className="mb-1">
 
-                  <strong>
-                    Issued By:
-                  </strong>{' '}
+                  <strong>Issued By:</strong>{' '}
 
                   {selectedCertificate.issuedBy ||
                     'Authorized Signatory'}
-
-                </p>
-
-
-                <p className="mb-1">
-
-                  <strong>
-                    Organization:
-                  </strong>{' '}
-
-                  {selectedCertificate.organization ||
-                    'Not specified'}
-
-                </p>
-
-
-                <p className="mb-1">
-
-                  <strong>
-                    Achievement:
-                  </strong>{' '}
-
-                  {selectedCertificate.achievement ||
-                    'Not specified'}
 
                 </p>
 
@@ -870,6 +1002,63 @@ function MyCertificate() {
           </Button>
 
         </Modal.Footer>
+
+
+      </Modal>
+
+
+
+      {/* ======================================
+          SHARE CERTIFICATE MODAL
+      ====================================== */}
+
+      <Modal
+        show={showShareModal}
+        onHide={() => setShowShareModal(false)}
+        size="lg"
+        centered
+      >
+
+
+        <Modal.Header closeButton>
+
+          <Modal.Title>
+
+            Share Certificate
+
+          </Modal.Title>
+
+        </Modal.Header>
+
+
+
+        <Modal.Body>
+
+          {selectedCertificate && (
+
+            <CertificateShare
+              certificate={selectedCertificate}
+            />
+
+          )}
+
+        </Modal.Body>
+
+
+
+        <Modal.Footer>
+
+          <Button
+            variant="secondary"
+            onClick={() => setShowShareModal(false)}
+          >
+
+            Close
+
+          </Button>
+
+        </Modal.Footer>
+
 
       </Modal>
 
