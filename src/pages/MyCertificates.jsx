@@ -38,15 +38,17 @@ function MyCertificate() {
 
   const [showModal, setShowModal] = useState(false)
   const [shareCertificate, setShareCertificate] = useState(null);
-
+const API_URL = 'https://backend-certificate-mw53.onrender.com'
 
   // LOAD CERTIFICATES
   // LOAD CERTIFICATES FROM BACKEND
 useEffect(() => {
   const fetchCertificates = async () => {
     try {
+      setLoading(true)
+
       const response = await fetch(
-        'http://localhost:5000/api/certificates'
+        'https://backend-certificate-mw53.onrender.com/api/certificates'
       )
 
       if (!response.ok) {
@@ -57,10 +59,11 @@ useEffect(() => {
 
       setCertificates(data)
     } catch (error) {
-      console.error(
-        'Error loading certificates:',
-        error
-      )
+      console.error('Error fetching certificates:', error)
+
+      setCertificates([])
+    } finally {
+      setLoading(false)
     }
   }
 
