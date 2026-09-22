@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 
 import {
@@ -23,139 +22,266 @@ import { useNavigate } from 'react-router-dom'
 
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
-import CertificateShare from "../components/CertificateShare";
 
 import CertificatePreview from '../components/CertificatePreview'
 
 
 function MyCertificate() {
+
   const navigate = useNavigate()
 
+  // BACKEND API URL
+  const API_URL =
+    'https://backend-certificate-mw53.onrender.com'
+
+
+  // STATES
   const [certificates, setCertificates] = useState([])
 
   const [selectedCertificate, setSelectedCertificate] =
     useState(null)
 
   const [showModal, setShowModal] = useState(false)
-  const [shareCertificate, setShareCertificate] = useState(null);
-const API_URL = 'https://backend-certificate-mw53.onrender.com'
 
-  // LOAD CERTIFICATES
+  const [loading, setLoading] = useState(true)
+
+
+  // ==========================================
   // LOAD CERTIFICATES FROM BACKEND
-useEffect(() => {
-  const fetchCertificates = async () => {
-    try {
-      setLoading(true)
+  // ==========================================
 
-      const response = await fetch(
-        'https://backend-certificate-mw53.onrender.com/api/certificates'
-      )
+  useEffect(() => {
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch certificates')
+    const fetchCertificates = async () => {
+
+      try {
+
+        setLoading(true)
+
+        const response = await fetch(
+          `${API_URL}/api/certificates`
+        )
+
+        const result = await response.json()
+
+        console.log('Backend response:', result)
+
+
+        if (!response.ok) {
+
+          throw new Error(
+            result.message || 'Failed to fetch certificates'
+          )
+
+        }
+
+
+        // Handle different backend response formats
+
+        const certificateList = Array.isArray(result)
+          ? result
+          : result.certificates ||
+            result.data ||
+            []
+
+
+        setCertificates(certificateList)
+
+
+      } catch (error) {
+
+        console.error(
+          'Error fetching certificates:',
+          error
+        )
+
+        setCertificates([])
+
+      } finally {
+
+        setLoading(false)
+
       }
 
-      const data = await response.json()
-
-      setCertificates(data)
-    } catch (error) {
-      console.error('Error fetching certificates:', error)
-
-      setCertificates([])
-    } finally {
-      setLoading(false)
     }
-  }
-
-  fetchCertificates()
-}, [])
 
 
+    fetchCertificates()
+
+  }, [])
+
+
+  // ==========================================
   // VIEW CERTIFICATE
+  // ==========================================
+
   const handleView = (certificate) => {
+
     setSelectedCertificate(certificate)
+
     setShowModal(true)
+
   }
 
 
+  // ==========================================
   // EDIT CERTIFICATE
+  // ==========================================
+
   const handleEdit = (certificate) => {
+
     localStorage.setItem(
       'editingCertificate',
       JSON.stringify(certificate)
     )
 
     navigate('/create-certificate')
+
   }
 
 
+  // ==========================================
   // DELETE CERTIFICATE
-  // DELETE CERTIFICATE FROM BACKEND
-const handleDelete = async (certificateId) => {
-  try {
-    const response = await fetch(
-      `http://localhost:5000/api/certificates/${certificateId}`,
-      {
-        method: 'DELETE'
-      }
+  // ==========================================
+
+  const handleDelete = async (certificateId) => {
+
+    const confirmDelete = window.confirm(
+      'Are you sure you want to delete this certificate?'
     )
 
-    if (!response.ok) {
-      throw new Error('Failed to delete certificate')
+
+    if (!confirmDelete) {
+      return
     }
 
-    const updatedCertificates =
-      certificates.filter(
-        (certificate) =>
-          certificate.certificateId !== certificateId
+
+    try {
+
+      const response = await fetch(
+        `${API_URL}/api/certificates/${certificateId}`,
+        {
+          method: 'DELETE'
+        }
       )
 
-    setCertificates(updatedCertificates)
 
-    if (
-      selectedCertificate?.certificateId === certificateId
-    ) {
-      setSelectedCertificate(null)
-      setShowModal(false)
+      const result = await response.json()
+
+      console.log('Delete response:', result)
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          result.message || 'Failed to delete certificate'
+        )
+
+      }
+
+
+      // Remove deleted certificate from UI
+
+      const updatedCertificates =
+        certificates.filter(
+          (certificate) =>
+            certificate.certificateId !== certificateId
+        )
+
+
+      setCertificates(updatedCertificates)
+
+
+      // Close modal if deleted certificate is selected
+
+      if (
+        selectedCertificate?.certificateId === certificateId
+      ) {
+
+        setSelectedCertificate(null)
+
+        setShowModal(false)
+
+      }
+
+
+      alert('Certificate deleted successfully!')
+
+
+    } catch (error) {
+
+      console.error(
+        'Error deleting certificate:',
+        error
+      )
+
+      alert(
+        'Unable to delete certificate. Please try again.'
+      )
+
     }
-  } catch (error) {
-    console.error(
-      'Error deleting certificate:',
-      error
-    )
 
-    alert('Unable to delete certificate')
   }
-}
 
 
+  // ==========================================
   // PDF DOWNLOAD
-  const handlePdfClick = async (certificate, event) => {
-    try {
-      // Find the current certificate card
-      const card =
-        event.currentTarget.closest('.certificate-card')
+  // ==========================================
 
-      // Find the actual preview shown inside the card
+  const handlePdfClick = async (
+    certificate,
+    event
+  ) => {
+
+    try {
+
+      // Find current certificate card
+
+      const card =
+        event.currentTarget.closest(
+          '.certificate-card'
+        )
+
+
+      // Find certificate preview
+
       const preview =
-        card?.querySelector('.certificate-card-preview')
+        card?.querySelector(
+          '.certificate-card-preview'
+        )
+
 
       if (!preview) {
-        console.error('Certificate preview not found')
+
+        console.error(
+          'Certificate preview not found'
+        )
+
         return
+
       }
+
 
       // Wait until fonts are loaded
+
       if (document.fonts?.ready) {
+
         await document.fonts.ready
+
       }
 
-      // Small delay to ensure rendering is complete
+
+      // Wait for rendering
+
       await new Promise((resolve) => {
+
         setTimeout(resolve, 300)
+
       })
 
-      // Capture the actual card preview
+
+      // Capture certificate preview
+
       const canvas = await html2canvas(
         preview,
         {
@@ -169,21 +295,29 @@ const handleDelete = async (certificateId) => {
         }
       )
 
+
       const imageData =
-        canvas.toDataURL('image/png', 1.0)
+        canvas.toDataURL(
+          'image/png',
+          1.0
+        )
 
 
       // Create PDF
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      })
+
+      const pdf = new jsPDF(
+        {
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4',
+          compress: true
+        }
+      )
 
 
       const pageWidth =
         pdf.internal.pageSize.getWidth()
+
 
       const pageHeight =
         pdf.internal.pageSize.getHeight()
@@ -192,23 +326,28 @@ const handleDelete = async (certificateId) => {
       const imageRatio =
         canvas.width / canvas.height
 
+
       let imageWidth = pageWidth
 
       let imageHeight =
         imageWidth / imageRatio
 
 
-      // Keep the entire image inside the A4 page
+      // Keep image inside A4 page
+
       if (imageHeight > pageHeight) {
+
         imageHeight = pageHeight
 
         imageWidth =
           imageHeight * imageRatio
+
       }
 
 
       const positionX =
         (pageWidth - imageWidth) / 2
+
 
       const positionY =
         (pageHeight - imageHeight) / 2
@@ -227,35 +366,97 @@ const handleDelete = async (certificateId) => {
 
 
       // Create safe file name
+
       const recipientName =
-        certificate.recipientName || 'certificate'
+        certificate.recipientName ||
+        'certificate'
+
 
       const safeFileName =
         recipientName
           .trim()
-          .replace(/[^a-zA-Z0-9-_ ]/g, '')
-          .replace(/\s+/g, '-')
+          .replace(
+            /[^a-zA-Z0-9-_ ]/g,
+            ''
+          )
+          .replace(
+            /\s+/g,
+            '-'
+          )
 
 
       // Download PDF
+
       pdf.save(
         `${safeFileName}-certificate.pdf`
       )
 
+
     } catch (error) {
+
       console.error(
         'PDF generation failed:',
         error
       )
 
+
       alert(
         'Unable to generate PDF. Please try again.'
       )
+
     }
+
   }
 
 
+  // ==========================================
+  // LOADING STATE
+  // ==========================================
+
+  if (loading) {
+
+    return (
+
+      <main>
+
+        <Container className="py-5">
+
+          <div className="text-center py-5">
+
+            <div
+              className="spinner-border text-primary mb-3"
+              role="status"
+            >
+              <span className="visually-hidden">
+                Loading...
+              </span>
+            </div>
+
+            <h5>
+              Loading certificates...
+            </h5>
+
+            <p className="text-secondary">
+              Please wait while your certificates are loading.
+            </p>
+
+          </div>
+
+        </Container>
+
+      </main>
+
+    )
+
+  }
+
+
+  // ==========================================
+  // PAGE UI
+  // ==========================================
+
   return (
+
     <main>
 
       <Container className="py-5">
@@ -314,7 +515,10 @@ const handleDelete = async (certificateId) => {
             {certificates.map((certificate) => (
 
               <Col
-                key={certificate.certificateId}
+                key={
+                  certificate.id ||
+                  certificate.certificateId
+                }
                 xs={12}
                 md={6}
                 xl={6}
@@ -341,7 +545,9 @@ const handleDelete = async (certificateId) => {
 
                   <Card.Body>
 
-                    <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div
+                      className="d-flex justify-content-between align-items-start gap-2 mb-2"
+                    >
 
                       <div>
 
@@ -371,6 +577,8 @@ const handleDelete = async (certificateId) => {
 
 
 
+                    {/* CERTIFICATE INFORMATION */}
+
                     <div className="small text-secondary mb-3">
 
                       <div>
@@ -378,7 +586,10 @@ const handleDelete = async (certificateId) => {
                         Certificate ID:{' '}
 
                         <strong>
-                          {certificate.certificateId}
+
+                          {certificate.certificateId ||
+                            'Not available'}
+
                         </strong>
 
                       </div>
@@ -406,7 +617,7 @@ const handleDelete = async (certificateId) => {
                     <div className="d-flex flex-wrap gap-2">
 
 
-                      {/* VIEW */}
+                      {/* VIEW BUTTON */}
 
                       <Button
                         variant="outline-primary"
@@ -427,7 +638,7 @@ const handleDelete = async (certificateId) => {
 
 
 
-                      {/* EDIT */}
+                      {/* EDIT BUTTON */}
 
                       <Button
                         variant="outline-secondary"
@@ -448,7 +659,7 @@ const handleDelete = async (certificateId) => {
 
 
 
-                      {/* PDF DOWNLOAD */}
+                      {/* PDF BUTTON */}
 
                       <Button
                         variant="outline-success"
@@ -472,7 +683,7 @@ const handleDelete = async (certificateId) => {
 
 
 
-                      {/* DELETE */}
+                      {/* DELETE BUTTON */}
 
                       <Button
                         variant="outline-danger"
@@ -492,15 +703,10 @@ const handleDelete = async (certificateId) => {
                         Delete
 
                       </Button>
-                      <Button
-  variant="outline-primary"
-  size="sm"
-  onClick={() => setShareCertificate(certificate)}
->
-  Share
-</Button>
+
 
                     </div>
+
 
                   </Card.Body>
 
@@ -543,14 +749,16 @@ const handleDelete = async (certificateId) => {
 
             <>
 
-              {/* SAME CERTIFICATE DESIGN */}
+              {/* CERTIFICATE DESIGN */}
 
               <div className="certificate-modal-preview">
 
                 <div className="certificate-card-preview">
 
                   <CertificatePreview
-                    certificateData={selectedCertificate}
+                    certificateData={
+                      selectedCertificate
+                    }
                     compact={true}
                   />
 
@@ -560,7 +768,7 @@ const handleDelete = async (certificateId) => {
 
 
 
-              {/* CERTIFICATE INFORMATION */}
+              {/* CERTIFICATE DETAILS */}
 
               <div className="mt-4">
 
@@ -571,25 +779,33 @@ const handleDelete = async (certificateId) => {
 
                 <p className="mb-1">
 
-                  <strong>Recipient:</strong>{' '}
+                  <strong>
+                    Recipient:
+                  </strong>{' '}
 
-                  {selectedCertificate.recipientName}
-
-                </p>
-
-
-                <p className="mb-1">
-
-                  <strong>Certificate ID:</strong>{' '}
-
-                  {selectedCertificate.certificateId}
+                  {selectedCertificate.recipientName ||
+                    'Not specified'}
 
                 </p>
 
 
                 <p className="mb-1">
 
-                  <strong>Issue Date:</strong>{' '}
+                  <strong>
+                    Certificate ID:
+                  </strong>{' '}
+
+                  {selectedCertificate.certificateId ||
+                    'Not specified'}
+
+                </p>
+
+
+                <p className="mb-1">
+
+                  <strong>
+                    Issue Date:
+                  </strong>{' '}
 
                   {selectedCertificate.issueDate ||
                     'Not specified'}
@@ -599,10 +815,36 @@ const handleDelete = async (certificateId) => {
 
                 <p className="mb-1">
 
-                  <strong>Issued By:</strong>{' '}
+                  <strong>
+                    Issued By:
+                  </strong>{' '}
 
                   {selectedCertificate.issuedBy ||
                     'Authorized Signatory'}
+
+                </p>
+
+
+                <p className="mb-1">
+
+                  <strong>
+                    Organization:
+                  </strong>{' '}
+
+                  {selectedCertificate.organization ||
+                    'Not specified'}
+
+                </p>
+
+
+                <p className="mb-1">
+
+                  <strong>
+                    Achievement:
+                  </strong>{' '}
+
+                  {selectedCertificate.achievement ||
+                    'Not specified'}
 
                 </p>
 
@@ -613,71 +855,29 @@ const handleDelete = async (certificateId) => {
           )}
 
         </Modal.Body>
-        
 
 
 
-        
+        <Modal.Footer>
+
+          <Button
+            variant="secondary"
+            onClick={() => setShowModal(false)}
+          >
+
+            Close
+
+          </Button>
+
+        </Modal.Footer>
 
       </Modal>
-      {/* VIEW CERTIFICATE MODAL */}
-
-<Modal
-  show={showModal}
-  onHide={() => setShowModal(false)}
-  centered
-  size="lg"
->
-  {/* Your existing View Modal content */}
-</Modal>
-
-
-{/* SHARE CERTIFICATE MODAL */}
-
-<Modal
-  show={Boolean(shareCertificate)}
-  onHide={() => setShareCertificate(null)}
-  centered
-  size="lg"
->
-  <Modal.Header closeButton>
-    <Modal.Title>
-      Share Certificate
-    </Modal.Title>
-  </Modal.Header>
-
-  <Modal.Body>
-    {shareCertificate && (
-      <>
-        <div className="mb-3">
-          <h5 className="fw-bold">
-            {shareCertificate.recipientName}
-          </h5>
-
-          <p className="text-secondary mb-0">
-            Certificate ID:{" "}
-            {shareCertificate.certificateId}
-          </p>
-        </div>
-
-        <CertificateShare certificate={shareCertificate} />
-      </>
-    )}
-  </Modal.Body>
-
-  <Modal.Footer>
-    <Button
-      variant="secondary"
-      onClick={() => setShareCertificate(null)}
-    >
-      Close
-    </Button>
-  </Modal.Footer>
-</Modal>
 
 
     </main>
+
   )
+
 }
 
 
