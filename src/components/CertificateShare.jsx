@@ -84,13 +84,7 @@ function CertificateShare({ certificate }) {
         </div>
       </div>
 
-      <div className="d-flex flex-wrap gap-2">
-        <Button variant="primary" onClick={handleNativeShare}>
-          Share
-        </Button>
-
-       
-      </div>
+      
     </div>
   );
 }
