@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Spinner, Button } from "react-bootstrap";
@@ -13,16 +14,18 @@ function VerifyCertificate() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const certificateRef = useRef(null);
 
-  // FETCH CERTIFICATE
+  const API_URL = "https://backend-certificate-mw53.onrender.com";
 
+  // FETCH CERTIFICATE
   useEffect(() => {
     const fetchCertificate = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/certificates/verify/${encodeURIComponent(
+          `${API_URL}/api/certificates/verify/${encodeURIComponent(
             certificateId
           )}`
         );
@@ -38,8 +41,7 @@ function VerifyCertificate() {
         setCertificate(data);
       } catch (error) {
         console.error("Verification error:", error);
-
-        setError(error.message);
+        setError(error.message || "Failed to fetch");
       } finally {
         setLoading(false);
       }
@@ -48,8 +50,26 @@ function VerifyCertificate() {
     fetchCertificate();
   }, [certificateId]);
 
-  // DOWNLOAD CERTIFICATE AS PDF
+  // COPY VERIFICATION LINK
+  const handleCopyLink = async () => {
+    const verificationLink = `${window.location.origin}/verify/${certificateId}`;
 
+    try {
+      await navigator.clipboard.writeText(verificationLink);
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Copy link failed:", error);
+
+      alert("Unable to copy link");
+    }
+  };
+
+  // DOWNLOAD CERTIFICATE AS PDF
   const handleDownloadPDF = async () => {
     if (!certificateRef.current || !certificate) {
       return;
@@ -81,8 +101,7 @@ function VerifyCertificate() {
       const imageHeight =
         (canvas.height * imageWidth) / canvas.width;
 
-      const positionY =
-        (pageHeight - imageHeight) / 2;
+      const positionY = (pageHeight - imageHeight) / 2;
 
       pdf.addImage(
         imageData,
@@ -106,7 +125,6 @@ function VerifyCertificate() {
   };
 
   // LOADING
-
   if (loading) {
     return (
       <div className="text-center mt-5">
@@ -120,7 +138,6 @@ function VerifyCertificate() {
   }
 
   // ERROR
-
   if (error) {
     return (
       <div className="container text-center mt-5">
@@ -134,12 +151,10 @@ function VerifyCertificate() {
   }
 
   // CERTIFICATE VIEW
-
   return (
     <div className="container py-5">
 
       {/* VERIFICATION HEADING */}
-
       <div className="text-center mb-4">
         <h2 className="text-success fw-bold">
           ✓ Certificate Verified
@@ -151,7 +166,6 @@ function VerifyCertificate() {
       </div>
 
       {/* CERTIFICATE DESIGN */}
-
       <div className="d-flex justify-content-center">
         <div
           ref={certificateRef}
@@ -168,11 +182,19 @@ function VerifyCertificate() {
         </div>
       </div>
 
-      {/* DOWNLOAD BUTTON */}
+      {/* BUTTONS */}
+      <div className="text-center mt-4 d-flex justify-content-center gap-3 flex-wrap">
 
-      <div
-        className="text-center mt-4"
-      >
+        {/* COPY LINK BUTTON */}
+        <Button
+          variant="success"
+          size="lg"
+          onClick={handleCopyLink}
+        >
+          {copied ? "✓ Link Copied" : "🔗 Copy Link"}
+        </Button>
+
+        {/* DOWNLOAD BUTTON */}
         <Button
           variant="primary"
           size="lg"
@@ -183,8 +205,8 @@ function VerifyCertificate() {
             ? "Preparing PDF..."
             : "Download Certificate PDF"}
         </Button>
-      </div>
 
+      </div>
     </div>
   );
 }

@@ -24,25 +24,8 @@ function CertificateShare({ certificate }) {
     }
   };
 
-  const handleEmailShare = () => {
-    const subject = encodeURIComponent(
-      `Certificate of Achievement - ${certificate.recipientName}`
-    );
-
-    const body = encodeURIComponent(
-      `Hello,\n\nYou can view and verify the certificate using this link:\n\n${certificateUrl}`
-    );
-
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
-
-  const handleLinkedInShare = () => {
-    const linkedInUrl =
-      `https://www.linkedin.com/sharing/share-offsite/?url=` +
-      encodeURIComponent(certificateUrl);
-
-    window.open(linkedInUrl, "_blank", "noopener,noreferrer");
-  };
+  
+  
 
   const handleNativeShare = async () => {
     if (!navigator.share) {
