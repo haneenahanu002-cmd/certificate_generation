@@ -1,4 +1,3 @@
-
 import { Card, Form, Button } from 'react-bootstrap'
 import { Save } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -9,6 +8,9 @@ function CertificateForm({
   editingCertificate
 }) {
   const navigate = useNavigate()
+
+  // Render Backend URL
+  const API_URL = 'https://backend-certificate-mw53.onrender.com'
 
   // Check whether the user is editing an existing certificate
   const isEditing = Boolean(editingCertificate)
@@ -23,89 +25,87 @@ function CertificateForm({
     }))
   }
 
-  // Save or update certificate
- // SAVE OR UPDATE CERTIFICATE
-const handleSave = async () => {
-  // Validate required fields
-  if (
-    !certificateData.organization?.trim() ||
-    !certificateData.recipientName?.trim() ||
-    !certificateData.achievement?.trim() ||
-    !certificateData.issueDate ||
-    !certificateData.issuedBy?.trim()
-  ) {
-    alert('Please fill all required fields.')
-    return
-  }
-
-  // Existing database ID or new ID
-  const databaseId =
-    editingCertificate?.id ||
-    editingCertificate?._id ||
-    certificateData.id ||
-    Date.now()
-
-  const certificateToSave = {
-    ...certificateData,
-    id: databaseId,
-    certificateId: certificateData.certificateId
-  }
-
-  try {
-    let response
-
-    if (isEditing) {
-      // UPDATE EXISTING CERTIFICATE
-      response = await fetch(
-        `http://localhost:5000/api/certificates/${encodeURIComponent(
-          databaseId
-        )}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(certificateToSave)
-        }
-      )
-    } else {
-      // CREATE NEW CERTIFICATE
-      response = await fetch(
-        'http://localhost:5000/api/certificates',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(certificateToSave)
-        }
-      )
+  // SAVE OR UPDATE CERTIFICATE
+  const handleSave = async () => {
+    // Validate required fields
+    if (
+      !certificateData.organization?.trim() ||
+      !certificateData.recipientName?.trim() ||
+      !certificateData.achievement?.trim() ||
+      !certificateData.issueDate ||
+      !certificateData.issuedBy?.trim()
+    ) {
+      alert('Please fill all required fields.')
+      return
     }
 
-    const result = await response.json()
+    // Preserve certificate ID and database ID
+    const certificateToSave = {
+      ...certificateData,
 
-    if (!response.ok) {
-      throw new Error(
-        result.message || 'Failed to save certificate'
-      )
+      // Certificate ID remains unchanged
+      certificateId: certificateData.certificateId,
+
+      // Keep existing database ID while editing
+      id: editingCertificate?.id || Date.now()
     }
 
-    localStorage.removeItem('editingCertificate')
+    try {
+      let response
 
-    alert(
-      isEditing
-        ? 'Certificate updated successfully!'
-        : 'Certificate saved successfully!'
-    )
+      if (isEditing) {
+        // UPDATE EXISTING CERTIFICATE
+        response = await fetch(
+          `${API_URL}/api/certificates/${editingCertificate.id}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(certificateToSave)
+          }
+        )
+      } else {
+        // CREATE NEW CERTIFICATE
+        response = await fetch(
+          `${API_URL}/api/certificates`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(certificateToSave)
+          }
+        )
+      }
 
-    navigate('/my-certificates')
-  } catch (error) {
-    console.error('Error saving certificate:', error)
+      if (!response.ok) {
+        throw new Error('Failed to save certificate')
+      }
 
-    alert(`Unable to save certificate: ${error.message}`)
+      // Remove edit mode
+      localStorage.removeItem('editingCertificate')
+
+      // Show success message
+      alert(
+        isEditing
+          ? 'Certificate updated successfully!'
+          : 'Certificate saved successfully!'
+      )
+
+      // Navigate to My Certificates
+      navigate('/my-certificates')
+    } catch (error) {
+      console.error(
+        'Error saving certificate:',
+        error
+      )
+
+      alert(
+        'Unable to save certificate. Please check your backend server.'
+      )
+    }
   }
-}
-
 
   return (
     <Card className="border-0 shadow-sm">
