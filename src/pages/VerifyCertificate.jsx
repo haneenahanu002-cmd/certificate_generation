@@ -71,84 +71,91 @@ function VerifyCertificate() {
 
   // DOWNLOAD CERTIFICATE AS PDF
   const handleDownloadPDF = async () => {
-    if (!certificateRef.current || !certificate) {
-      return;
-    }
-
-    try {
-      setDownloading(true);
-
-      const certificateElement = certificateRef.current;
-
-      const canvas = await html2canvas(certificateElement, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-
-      const imageData = canvas.toDataURL("image/png");
-
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imageWidth = pageWidth;
-      const imageHeight =
-        (canvas.height * imageWidth) / canvas.width;
-
-      const positionY = (pageHeight - imageHeight) / 2;
-
-      pdf.addImage(
-        imageData,
-        "PNG",
-        0,
-        positionY > 0 ? positionY : 0,
-        imageWidth,
-        imageHeight
-      );
-
-      pdf.save(
-        `${certificate.recipientName || "certificate"}-certificate.pdf`
-      );
-    } catch (error) {
-      console.error("PDF download failed:", error);
-
-      alert("Unable to download certificate PDF");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  // LOADING
-  if (loading) {
-    return (
-      <div className="text-center mt-5">
-        <Spinner animation="border" />
-
-        <p className="mt-3">
-          Verifying certificate...
-        </p>
-      </div>
-    );
+  if (!certificateRef.current || !certificate) {
+    return;
   }
 
-  // ERROR
-  if (error) {
-    return (
-      <div className="container text-center mt-5">
-        <h2 className="text-danger">
-          Invalid Certificate
-        </h2>
+  try {
+    setDownloading(true);
 
-        <p>{error}</p>
-      </div>
+    const certificateElement = certificateRef.current;
+
+    // Wait for fonts to load
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+
+    // Wait for certificate preview to render
+    await new Promise((resolve) => {
+      setTimeout(resolve, 300);
+    });
+
+    const canvas = await html2canvas(certificateElement, {
+      scale: 3,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: "#ffffff",
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+    });
+
+    const imageData = canvas.toDataURL("image/png", 1.0);
+
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+      compress: true,
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // Calculate image ratio
+    const imageRatio = canvas.width / canvas.height;
+
+    let imageWidth = pageWidth;
+    let imageHeight = imageWidth / imageRatio;
+
+    // Fit image inside A4 page
+    if (imageHeight > pageHeight) {
+      imageHeight = pageHeight;
+      imageWidth = imageHeight * imageRatio;
+    }
+
+    // Center image horizontally and vertically
+    const positionX = (pageWidth - imageWidth) / 2;
+    const positionY = (pageHeight - imageHeight) / 2;
+
+    pdf.addImage(
+      imageData,
+      "PNG",
+      positionX,
+      positionY,
+      imageWidth,
+      imageHeight,
+      undefined,
+      "FAST"
     );
+
+    const recipientName =
+      certificate.recipientName || "certificate";
+
+    const safeFileName = recipientName
+      .trim()
+      .replace(/[^a-zA-Z0-9-_ ]/g, "")
+      .replace(/\s+/g, "-");
+
+    pdf.save(`${safeFileName}-certificate.pdf`);
+  } catch (error) {
+    console.error("PDF download failed:", error);
+
+    alert("Unable to download certificate PDF");
+  } finally {
+    setDownloading(false);
   }
+};
 
   // CERTIFICATE VIEW
   return (

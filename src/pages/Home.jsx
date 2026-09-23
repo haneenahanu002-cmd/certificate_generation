@@ -346,7 +346,7 @@ function Home() {
               variant="light"
               size="lg"
               className="px-4"
-              onClick={() => navigate('/templates')}
+              onClick={() => navigate('/create-certificate')}
             >
               Get Started
               <ArrowRight size={18} className="ms-2" />
