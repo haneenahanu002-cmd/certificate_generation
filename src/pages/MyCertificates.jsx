@@ -810,7 +810,7 @@ function MyCertificate() {
                           className="me-1"
                         />
 
-                        Share
+                        share
 
                       </Button>
 

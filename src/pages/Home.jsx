@@ -84,7 +84,7 @@ function Home() {
                 <div className="d-flex align-items-center gap-2">
                   <CheckCircle size={18} className="text-success" />
                   <small className="text-secondary">
-                    Custom templates
+                    Manage Certificate
                   </small>
                 </div>
 
@@ -202,7 +202,7 @@ function Home() {
                   </div>
 
                   <h5 className="fw-bold">
-                    Beautiful Templates
+                    Beautiful Design
                   </h5>
 
                   <p className="text-secondary">
@@ -285,7 +285,7 @@ function Home() {
               </div>
 
               <h5 className="fw-bold">
-                Choose a Template
+                Choose a design color
               </h5>
 
               <p className="text-secondary">
